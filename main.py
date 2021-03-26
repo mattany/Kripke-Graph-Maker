@@ -26,10 +26,6 @@ class Transition(NamedTuple):
     destination: State
 
 
-def flip(bit: bool):
-    return not bit
-
-
 def same(item):
     return item
 
@@ -78,7 +74,7 @@ class Rule:
         return False
 
 
-rules = [
+rules = {
     # Start
     Rule([None, None, None, -1, None], [same, same, same, increment, same]),
     Rule([None, None, None, None, -1], [same, same, same, same, increment]),
@@ -106,10 +102,39 @@ rules = [
     # turn == i
     Rule([0, None, None, 3, None], [same, same, same, lambda x: 2, same]),
     Rule([1, None, None, None, 3], [same, same, same, same, lambda x: 2]),
+
     # ci=1
-    Rule([1, None, None, 4, None], [same, same, same, increment, same]),
-    Rule([0, None, None, None, 4], [same, same, same, same, increment]),
-]
+    Rule([None, None, None, 4, None], [same, one, same, increment, same]),
+    Rule([None, None, None, None, 4], [same, same, one, same, increment]),
+
+    # wait until turn=i
+    # turn == i
+    Rule([0, None, None, 5, None], [same, same, same, increment, same]),
+    Rule([1, None, None, None, 5], [same, same, same, same, increment]),
+
+    # turn == !i
+    Rule([1, None, None, 5, None], [same, same, same, same, same]),
+    Rule([0, None, None, None, 5], [same, same, same, same, same]),
+
+    # ci = 0
+    Rule([None, None, None, 6, None], [same, zero, same, increment, same]),
+    Rule([None, None, None, None, 6], [same, same, zero, same, increment]),
+
+    # ci = 1
+    Rule([None, None, None, 7, None], [same, one, same, increment, same]),
+    Rule([None, None, None, None, 7], [same, same, one, same, increment]),
+
+    # turn = !i
+    Rule([None, None, None, 8, None], [one, same, same, zero, same]),
+    Rule([None, None, None, None, 8], [zero, same, same, same, zero]),
+}
+
+initialStates = {
+    State(False, False, False, -1, -1),
+    # State(False, False, True, -1, -1),
+    # State(False, True, False, -1, -1),
+    # State(False, True, True, -1, -1),
+}
 
 
 class KripkeStructure(object):
@@ -131,7 +156,7 @@ class KripkeStructure(object):
         states = [str(s) for s in self.states]
         G.add_nodes_from(states)
         for t in self.transitions:
-            G.add_edge(t.origin, t.destination)
+            G.add_edge(str(t.origin), str(t.destination))
         pos = nx.drawing.nx_pydot.graphviz_layout(G, prog='dot')
         nx.draw_networkx(G, pos)
         nx.drawing.nx_pydot.write_dot(G, '../Chain.dot')
@@ -139,8 +164,9 @@ class KripkeStructure(object):
 
     def generateTransitions(self):
         visited = set()
-        q = deque()
+        q = deque(self.states)
         transitions = set()
+        i = 0
         while q:
             curState = q.popleft()
             for rule in self.rules:
@@ -150,6 +176,11 @@ class KripkeStructure(object):
                     if transition.destination not in visited:
                         q.append(transition.destination)
             visited.add(curState)
+            if i % 1000:
+                print(len(visited))
+            i += 1
+        self.states = visited
+        self.state_amount = len(self.states)
         return transitions
 
         # for state in states:
@@ -191,3 +222,8 @@ class KripkeStructure(object):
     #     empty_state_probability = next(v for k, v in state_dictionary.items() if k == "_")
     #     states.append(State("_", 0, empty_state_probability))
     #     return states
+
+
+if __name__ == "__main__":
+    kripke = KripkeStructure(initialStates, rules)
+    kripke.draw_transitions()
